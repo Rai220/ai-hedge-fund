@@ -14,16 +14,16 @@ from src.utils.progress import progress
 
 
 # -------------------------------
-# Внешний контракт (английский)
+# Внешний контракт
 # -------------------------------
 class OlegtinkoffSignal(BaseModel):
-    signal: Literal["bullish", "bearish", "neutral"]  # external interface in English
+    signal: Literal["bullish", "bearish", "neutral"]
     confidence: float
-    reasoning: str  # Russian text (persona speaks Russian)
+    reasoning: str
 
 
 # -------------------------------
-# Агент Олега Тинькова
+# Агент "Олег Тиньков"
 # -------------------------------
 def oleg_tinkoff_agent(state: AgentState, agent_id: str = "oleg_tinkoff_agent"):
     """
@@ -40,7 +40,9 @@ def oleg_tinkoff_agent(state: AgentState, agent_id: str = "oleg_tinkoff_agent"):
 
     for ticker in tickers:
         progress.update_status(agent_id, ticker, "Fetching financial metrics")
-        metrics = get_financial_metrics(ticker, end_date, period="ttm", limit=10, api_key=api_key)
+        metrics = get_financial_metrics(
+            ticker, end_date, period="ttm", limit=10, api_key=api_key
+        )
 
         progress.update_status(agent_id, ticker, "Gathering financial line items")
         financial_line_items = search_line_items(
@@ -83,8 +85,20 @@ def oleg_tinkoff_agent(state: AgentState, agent_id: str = "oleg_tinkoff_agent"):
         ev_check = quick_ev_check(financial_line_items, market_cap)
 
         # Итоговый счёт (условно 40 макс.)
-        total_score = growth["score"] + brand["score"] + unit_econ["score"] + bold["score"] + ev_check["score"]
-        max_possible_score = growth["max_score"] + brand["max_score"] + unit_econ["max_score"] + bold["max_score"] + ev_check["max_score"]
+        total_score = (
+            growth["score"]
+            + brand["score"]
+            + unit_econ["score"]
+            + bold["score"]
+            + ev_check["score"]
+        )
+        max_possible_score = (
+            growth["max_score"]
+            + brand["max_score"]
+            + unit_econ["max_score"]
+            + bold["max_score"]
+            + ev_check["max_score"]
+        )
 
         analysis_data[ticker] = {
             "ticker": ticker,
@@ -113,10 +127,14 @@ def oleg_tinkoff_agent(state: AgentState, agent_id: str = "oleg_tinkoff_agent"):
             "reasoning": tinkoff_output.reasoning,  # Russian text
         }
 
-        progress.update_status(agent_id, ticker, "Done", analysis=tinkoff_output.reasoning)
+        progress.update_status(
+            agent_id, ticker, "Done", analysis=tinkoff_output.reasoning
+        )
 
     # Сообщение для графа
-    message = HumanMessage(content=json.dumps(tinkoff_analysis, ensure_ascii=False), name=agent_id)
+    message = HumanMessage(
+        content=json.dumps(tinkoff_analysis, ensure_ascii=False), name=agent_id
+    )
 
     # Опционально показываем reasoning
     if state["metadata"].get("show_reasoning"):
@@ -193,7 +211,11 @@ def analyze_growth(financial_line_items: list) -> dict[str, Any]:
         elif gm > 0.25:
             score += 2
 
-    return {"score": max(min(score, max_score), -3), "max_score": max_score, "details": "; ".join(details)}
+    return {
+        "score": max(min(score, max_score), -3),
+        "max_score": max_score,
+        "details": "; ".join(details),
+    }
 
 
 def analyze_brand_power(financial_line_items: list, metrics: list) -> dict[str, Any]:
@@ -231,7 +253,11 @@ def analyze_brand_power(financial_line_items: list, metrics: list) -> dict[str, 
         elif avg > 0.25:
             score += 1
 
-    return {"score": min(score, max_score), "max_score": max_score, "details": "; ".join(details)}
+    return {
+        "score": min(score, max_score),
+        "max_score": max_score,
+        "details": "; ".join(details),
+    }
 
 
 def analyze_profitability_vs_burn(financial_line_items: list) -> dict[str, Any]:
@@ -267,7 +293,11 @@ def analyze_profitability_vs_burn(financial_line_items: list) -> dict[str, Any]:
         elif fcf_m < -0.10:
             score -= 2
 
-    return {"score": max(min(score, max_score), -3), "max_score": max_score, "details": "; ".join(details)}
+    return {
+        "score": max(min(score, max_score), -3),
+        "max_score": max_score,
+        "details": "; ".join(details),
+    }
 
 
 def analyze_bold_management(financial_line_items: list) -> dict[str, Any]:
@@ -297,10 +327,16 @@ def analyze_bold_management(financial_line_items: list) -> dict[str, Any]:
             score -= 1
             details.append("Дивиденды? Лучше вкладывать в разгон")
 
-    return {"score": max(min(score, max_score), -2), "max_score": max_score, "details": "; ".join(details)}
+    return {
+        "score": max(min(score, max_score), -2),
+        "max_score": max_score,
+        "details": "; ".join(details),
+    }
 
 
-def quick_ev_check(financial_line_items: list, market_cap: float | None) -> dict[str, Any]:
+def quick_ev_check(
+    financial_line_items: list, market_cap: float | None
+) -> dict[str, Any]:
     """
     Простейшая «нюх-проверка» оценки:
       - если market_cap огромная, а FCF крошечный/отрицательный — будьте осторожны
@@ -311,7 +347,11 @@ def quick_ev_check(financial_line_items: list, market_cap: float | None) -> dict
     fcf = _safe_series(financial_line_items, "free_cash_flow")
 
     if market_cap is None:
-        return {"score": 0, "max_score": max_score, "details": "Нет market cap — пропускаем"}
+        return {
+            "score": 0,
+            "max_score": max_score,
+            "details": "Нет market cap — пропускаем",
+        }
 
     details.append(f"Market cap ≈ {market_cap:,.0f}")
     if fcf and rev and rev[0] > 0:
@@ -322,7 +362,11 @@ def quick_ev_check(financial_line_items: list, market_cap: float | None) -> dict
         elif fcf_m < -0.10 and market_cap > max(rev[0] * 10, 1):
             score -= 3
             details.append("FCF −, а капа огромна — перебор")
-    return {"score": max(min(score, max_score), -3), "max_score": max_score, "details": "; ".join(details)}
+    return {
+        "score": max(min(score, max_score), -3),
+        "max_score": max_score,
+        "details": "; ".join(details),
+    }
 
 
 # -------------------------------
@@ -362,19 +406,27 @@ def generate_tinkoff_output(
 }}
 
 Правила:
-- signal строго из набора: bullish / bearish / neutral (английские слова).
+- signal строго из набора: bullish / bearish / neutral
 - reasoning — строго на русском языке, стиль «тиньковский»: дерзкий, образный, с акцентом на рост/бренд/маркетинг.
 - будь конкретен: укажи, что тянет вверх (рост, маржа, бренд) и что тянет вниз (затяжной burn, слабая динамика).
-- никаких английских слов в reasoning.
 """,
             ),
         ]
     )
 
-    prompt = template.invoke({"analysis_data": json.dumps(analysis_data, indent=2, ensure_ascii=False), "ticker": ticker})
+    prompt = template.invoke(
+        {
+            "analysis_data": json.dumps(analysis_data, indent=2, ensure_ascii=False),
+            "ticker": ticker,
+        }
+    )
 
     def default_signal():
-        return OlegtinkoffSignal(signal="neutral", confidence=50.0, reasoning="Данных мало. Спокойно стоим, смотрим на динамику. Если не ускорятся — выходим.")
+        return OlegtinkoffSignal(
+            signal="neutral",
+            confidence=50.0,
+            reasoning="Данных мало. Спокойно стоим, смотрим на динамику. Если не ускорятся — выходим.",
+        )
 
     return call_llm(
         prompt=prompt,
